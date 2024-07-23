@@ -1,4 +1,5 @@
 bin/
 obj/
 main
+imgui.ini
 .vscode/
