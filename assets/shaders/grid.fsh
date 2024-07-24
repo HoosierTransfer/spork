@@ -23,8 +23,38 @@ vec3 TurboColormap(in float x) {
         dot(v4, kBlueVec4)  + dot(v2, kBlueVec2));
 }
 
+// https://www.shadertoy.com/view/XsSXDy
+vec4 powers(float x) {
+    return vec4(x*x*x, x*x, x, 1.0);
+}
+
+vec4 ca = vec4(3.0,  -6.0,   0.0,  4.0) /  6.0;
+vec4 cb = vec4(-1.0,   6.0, -12.0,  8.0) /  6.0;
+
+vec4 spline(float x, vec4 c0, vec4 c1, vec4 c2, vec4 c3) {
+    return c0 * dot(cb, powers(x + 1.0)) + 
+    c1 * dot(ca, powers(x)) +
+    c2 * dot(ca, powers(1.0 - x)) +
+    c3 * dot(cb, powers(2.0 - x));
+}
+
+#define SAM(a,b)  texture(grid, (i+vec2(float(a),float(b))+0.5)/res, -99.0)
+
+vec4 texture_Bicubic(sampler2D tex, vec2 t) {
+    vec2 res = textureSize(tex, 0);
+    vec2 p = res*t - 0.5;
+    vec2 f = fract(p);
+    vec2 i = floor(p);
+    
+    return spline(f.y, spline(f.x, SAM(-1,-1), SAM(0,-1), SAM(1,-1), SAM(2,-1)),
+        spline(f.x, SAM(-1, 0), SAM(0, 0), SAM(1, 0), SAM(2, 0)),
+        spline(f.x, SAM(-1, 1), SAM(0, 1), SAM(1, 1), SAM(2, 1)),
+        spline(f.x, SAM(-1, 2), SAM(0, 2), SAM(1, 2), SAM(2, 2)));
+}
+
 void main() {
-    float value = texture(grid, TexCoord).r;
+    vec4 interpolatedValue = texture_Bicubic(grid, TexCoord);
+    float value = interpolatedValue.r;
     
     vec3 color = TurboColormap(value);
     

@@ -1,8 +1,8 @@
 CC := gcc
 CXX := g++
 CFLAGS := -std=c11 -Werror -g -Iinclude -MMD
-CXXFLAGS := -std=c++17 -Werror -g -Iinclude -MMD
-LDFLAGS := -lglfw -lGL -lX11 -lpthread -lXrandr -lXi -ldl
+CXXFLAGS := -std=c++17 -Werror -g -Iinclude -MMD -fopenmp
+LDFLAGS := -lglfw -lX11 -lpthread -lXrandr -lXi -ldl -lfftw3 -fopenmp
 BIN_DIR := bin
 SRC_DIR := src
 OBJ_DIR := obj

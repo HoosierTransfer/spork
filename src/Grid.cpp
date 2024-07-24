@@ -37,20 +37,32 @@ Grid::Grid(unsigned int width, unsigned int height) : width(width), height(heigh
 
     shader.compile();
 
-    grid = std::vector<float>(width * height, 0.0f);
-    
-    for (unsigned int y = 0; y < height; y++) {
-        for (unsigned int x = 0; x < width; x++) {
-            grid[y * width + x] = rand() / (float)RAND_MAX;
-        }
-    }
+    data = std::vector<std::vector<double>>(height, std::vector<double>(width, 0.0));
 
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RED, GL_FLOAT, grid.data());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RED, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0); // Unbind the texture
+}
+
+Grid::~Grid() {
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &EBO);
+    glDeleteTextures(1, &texture);
+}
+
+float* Grid::getData() {
+    float* data = new float[width * height];
+    for (unsigned int y = 0; y < height; y++) {
+        for (unsigned int x = 0; x < width; x++) {
+            data[y * width + x] = this->data[y][x];
+        }
+    }
+
+    return data;
 }
 
 void Grid::draw() {
@@ -61,7 +73,7 @@ void Grid::draw() {
 
     void* ptr = glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
     if (ptr) {
-        memcpy(ptr, grid.data(), width * height * sizeof(float));
+        memcpy(ptr, getData(), width * height * sizeof(float));
         glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
     }
 
@@ -82,12 +94,12 @@ void Grid::draw() {
 
 void Grid::setWidth(unsigned int width) {
     this->width = width;
-    grid = std::vector<float>(width * height, 0.0f);
+    data = std::vector<std::vector<double>>(height, std::vector<double>(width, 0.0));
 }
 
 void Grid::setHeight(unsigned int height) {
     this->height = height;
-    grid = std::vector<float>(width * height, 0.0f);
+    data = std::vector<std::vector<double>>(height, std::vector<double>(width, 0.0));
 }
 
 unsigned int Grid::getWidth() const {
@@ -98,87 +110,38 @@ unsigned int Grid::getHeight() const {
     return height;
 }
 
-float& Grid::operator()(unsigned int x, unsigned int y) {
-    return grid[y * width + x];
+std::vector<double>& Grid::operator[](unsigned int row) {
+    return data[row];
 }
 
-std::vector<float>& Grid::operator[](unsigned int row) {
-    rowVec.resize(width); // Resize the member variable
-    for (unsigned int i = 0; i < width; i++) {
-        rowVec[i] = grid[row * width + i];
-    }
-
-    return rowVec;
+void Grid::set(unsigned int x, unsigned int y, double value) {
+    data[y][x] = value;
 }
 
-void Grid::set(unsigned int x, unsigned int y, float value) {
-    grid[y * width + x] = value;
+double Grid::get(unsigned int x, unsigned int y) const {
+    return data[y][x];
 }
 
-float Grid::get(unsigned int x, unsigned int y) const {
-    return grid[y * width + x];
+void Grid::reset() {
+    std::fill(data.begin(), data.end(), std::vector<double>(width, 0.0));
 }
 
-float func_smooth(float x, float a, float ea) {
-    return 1.0f / (1.0f + std::exp(-(x - a) * 4.0f / ea));
-}
-
-float sigmoid_ab(float sn, float x, float a, float b) {
-    return func_smooth(x, a, sn) * (1.0f - func_smooth(x, b, sn));
-}
-
-float sigmoid_mix(float sm, float x, float y, float m) {
-    return x + func_smooth(m, 0.5f, sm) * (y - x);
-}
-
-void Grid::update() {
-    float birthStart = 0.27f;
-    float birthEnd = 0.34f;
-    float deathStart = 0.52;
-    float deathEnd = 0.1f;
-
-    float alpha_n = 0.03f;
-    float alpha_m = 0.15f;
-
-    float dt = 0.116f;
-
+void Grid::randomize() {
     for (unsigned int y = 0; y < height; y++) {
         for (unsigned int x = 0; x < width; x++) {
-            float n = 0.0f;
-            float m = 0.0f;
+            data[y][x] = rand() / (double)RAND_MAX;
+        }
+    }
+}
 
-            for (int j = -1; j <= 1; j++) {
-                for (int i = -1; i <= 1; i++) {
-                    if (i == 0 && j == 0) {
-                        continue;
-                    }
-
-                    int x_ = x + i;
-                    int y_ = y + j;
-
-                    if (x_ < 0 || x_ >= width || y_ < 0 || y_ >= height) {
-                        continue;
-                    }
-
-                    n += grid[y_ * width + x_];
-                    m += grid[y_ * width + x_];
-                }
+void Grid::randomizePatches() {
+    for (int i = 0; i < randomPatches; i++) {
+        int x = rand() % width;
+        int y = rand() % height;
+        for (int j = 0; j < randomPatchSize; j++) {
+            for (int k = 0; k < randomPatchSize; k++) {
+                data[(y + j) % height][(x + k) % width] = rand() / (double)RAND_MAX;
             }
-
-            n /= 8.0f;
-            m /= 8.0f;
-
-            float prev = grid[y * width + x];
-
-            float s = sigmoid_ab(
-                alpha_n,
-                n,
-                sigmoid_mix(alpha_m, birthStart, deathStart, m),
-                sigmoid_mix(alpha_m, birthEnd, deathEnd, m)
-            );
-
-            float next = prev + dt * (s - prev);
-            grid[y * width + x] = std::clamp(next, 0.0f, 1.0f);
         }
     }
 }

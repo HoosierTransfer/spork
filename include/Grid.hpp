@@ -9,32 +9,41 @@
 class Grid {
 private:
     unsigned int VAO, VBO, EBO;
-    unsigned int width, height;
     std::vector<float> vertices;
     std::vector<unsigned int> indices;
     Shader shader;
     unsigned int texture;
 
-    std::vector<float> grid;
-
-    std::vector<float> rowVec;
-
     void normalize();
+
+    float* getData();
+
+protected:
+    unsigned int width, height;
+    std::vector<std::vector<double>> data;
 
 public:
     Grid(unsigned int width, unsigned int height);
+    virtual ~Grid();
     void draw();
-    void update();
+    virtual void update() {}
     void setWidth(unsigned int width);
     void setHeight(unsigned int height);
     unsigned int getWidth() const;
     unsigned int getHeight() const;
 
-    float& operator()(unsigned int x, unsigned int y);
+    void reset();
+    void randomize();
 
-    std::vector<float>& operator[](unsigned int row);
+    void randomizePatches();
 
-    void set(unsigned int x, unsigned int y, float value);
-    float get(unsigned int x, unsigned int y) const;
+    std::vector<double>& operator[](unsigned int row);
+    const std::vector<double>& operator[](unsigned int row) const;
+
+    void set(unsigned int x, unsigned int y, double value);
+    double get(unsigned int x, unsigned int y) const;
+
+    int randomPatches;
+    int randomPatchSize;
 };
 
