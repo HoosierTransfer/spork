@@ -74,3 +74,91 @@ double* convertToDoublePointer(std::vector<std::vector<double>>& vec, int subVec
     }
     return arr;
 }
+
+double sigmoid(double x, double a, double b) {
+    return 1.0 / (1.0 + exp(-4.0 * (x - 0.5)));
+}
+
+double Round(double x) {
+    return std::round(x * PRECISION) / PRECISION;
+}
+
+int RandomInt(int min, int max) {
+    return min + (rand() % (max - min + 1));
+}
+
+std::vector<std::vector<double>> convolve2D(const std::vector<std::vector<double>>& grid, const std::vector<std::vector<double>>& kernel) {
+    int rows = grid.size();
+    int cols = grid[0].size();
+    int krows = kernel.size();
+    int kcols = kernel[0].size();
+    
+    // Determine the size of the FFT (padded to prevent wrap-around effects)
+    int fftRows = rows;
+    int fftCols = cols;
+    
+    // Allocate memory for input, kernel, and output
+    fftw_complex *inGrid = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * fftRows * fftCols);
+    fftw_complex *inKernel = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * fftRows * fftCols);
+    fftw_complex *outGrid = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * fftRows * fftCols);
+    fftw_complex *outKernel = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * fftRows * fftCols);
+    
+    // Create plans
+    fftw_plan planForwardGrid = fftw_plan_dft_2d(fftRows, fftCols, inGrid, outGrid, FFTW_FORWARD, FFTW_ESTIMATE);
+    fftw_plan planForwardKernel = fftw_plan_dft_2d(fftRows, fftCols, inKernel, outKernel, FFTW_FORWARD, FFTW_ESTIMATE);
+    fftw_plan planBackward = fftw_plan_dft_2d(fftRows, fftCols, outGrid, inGrid, FFTW_BACKWARD, FFTW_ESTIMATE);
+    
+    // Initialize input arrays with zero padding
+    for (int i = 0; i < fftRows; ++i) {
+        for (int j = 0; j < fftCols; ++j) {
+            if (i < rows && j < cols) {
+                inGrid[i * fftCols + j][0] = grid[i][j];
+                inGrid[i * fftCols + j][1] = 0.0;
+            } else {
+                inGrid[i * fftCols + j][0] = 0.0;
+                inGrid[i * fftCols + j][1] = 0.0;
+            }
+            if (i < krows && j < kcols) {
+                inKernel[i * fftCols + j][0] = kernel[i][j];
+                inKernel[i * fftCols + j][1] = 0.0;
+            } else {
+                inKernel[i * fftCols + j][0] = 0.0;
+                inKernel[i * fftCols + j][1] = 0.0;
+            }
+        }
+    }
+    
+    // Execute forward FFTs
+    fftw_execute(planForwardGrid);
+    fftw_execute(planForwardKernel);
+    
+    // Perform element-wise multiplication in the frequency domain
+    for (int i = 0; i < fftRows * fftCols; ++i) {
+        double real = outGrid[i][0] * outKernel[i][0] - outGrid[i][1] * outKernel[i][1];
+        double imag = outGrid[i][0] * outKernel[i][1] + outGrid[i][1] * outKernel[i][0];
+        outGrid[i][0] = real;
+        outGrid[i][1] = imag;
+    }
+    
+    // Execute inverse FFT
+    fftw_execute(planBackward);
+    
+    // Normalize the result and copy to output vector
+    std::vector<std::vector<double>> result(rows, std::vector<double>(cols));
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            result[i][j] = inGrid[i * fftCols + j][0] / (fftRows * fftCols);
+        }
+    }
+    
+    // Free allocated memory
+    fftw_destroy_plan(planForwardGrid);
+    fftw_destroy_plan(planForwardKernel);
+    fftw_destroy_plan(planBackward);
+    fftw_free(inGrid);
+    fftw_free(inKernel);
+    fftw_free(outGrid);
+    fftw_free(outKernel);
+    
+    return roll(result, -1, -1);
+}

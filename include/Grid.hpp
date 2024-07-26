@@ -6,6 +6,8 @@
 
 #include <Shader.hpp>
 
+#include <string>
+
 class Grid {
 private:
     unsigned int VAO, VBO, EBO;
@@ -26,11 +28,15 @@ public:
     Grid(unsigned int width, unsigned int height);
     virtual ~Grid();
     void draw();
-    virtual void update() {}
+    virtual void update() = 0;
+    virtual void drawImGui() = 0;
     void setWidth(unsigned int width);
     void setHeight(unsigned int height);
     unsigned int getWidth() const;
     unsigned int getHeight() const;
+
+    virtual void parse(std::string pattern) = 0;
+    virtual std::string toString() const = 0;
 
     void reset();
     void randomize();

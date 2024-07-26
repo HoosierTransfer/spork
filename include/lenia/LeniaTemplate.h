@@ -11,7 +11,7 @@ typedef struct {
     std::vector<double> kernel_E; // unused
     int coreId;
     int layerId;
-    int deltaId; // TODO: implement
+    int deltaId;
     double alpha;
     bool limitValue; // unused
 } LeniaTemplate;

@@ -1,0 +1,26 @@
+{
+    "children": [
+        {
+            "data": "",
+            "name": "Lenia"
+        },
+        {
+            "children": [
+                {
+                    "children": [
+                        {
+                            "data": "",
+                            "name": "Lenia3"
+                        }
+                    ],
+                    "data": "",
+                    "name": "Lenia2"
+                }
+            ],
+            "data": "",
+            "name": "Lenia1"
+        }
+    ],
+    "data": "",
+    "name": "Lenia"
+}

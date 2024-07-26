@@ -5,16 +5,18 @@
 #include <iostream>
 #include <stdexcept>
 
-FastConv2D::FastConv2D(std::vector<std::vector<double>> kernel, int inputWidth, int inputHeight) : Conv2D(kernel, inputWidth, inputHeight) {
+FastConv2D::FastConv2D(std::vector<std::vector<double>> kernel, int inputWidth, int inputHeight) {
     int kernelWidth = kernel.size();
     int kernelHeight = kernel[0].size();
+
+    if (kernelWidth != inputWidth || kernelHeight != inputHeight) {
+        throw std::invalid_argument("Kernel size must not exceed input size for FastConv2D");
+    }
 
     fftw_complex* kernelIn = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * inputWidth * inputHeight);
     _kernel_fft = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * inputWidth * inputHeight);
     fftw_plan kernelPlan = fftw_plan_dft_2d(inputWidth, inputHeight, kernelIn, _kernel_fft, FFTW_FORWARD, FFTW_PATIENT);
-    if (kernelWidth != inputWidth || kernelHeight != inputHeight) {
-        throw std::invalid_argument("Kernel size must match input size for FastConv2D");
-    }
+
     for (int x = 0; x < inputWidth; x++) {
         for (int y = 0; y < inputHeight; y++) {
             kernelIn[x * inputHeight + y][0] = kernel[x][y];
@@ -27,7 +29,7 @@ FastConv2D::FastConv2D(std::vector<std::vector<double>> kernel, int inputWidth, 
     fftw_free(kernelIn);
 
     _grid_fft = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * inputWidth * inputHeight);
-    _input_fft = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * inputWidth * inputHeight);    
+    _input_fft = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * inputWidth * inputHeight);
 
     _gridPlan = fftw_plan_dft_2d(inputWidth, inputHeight, _input_fft, _grid_fft, FFTW_FORWARD, FFTW_PATIENT);
     _inversePlan = fftw_plan_dft_2d(inputWidth, inputHeight, _grid_fft, _input_fft, FFTW_BACKWARD, FFTW_PATIENT);
@@ -72,5 +74,5 @@ std::vector<std::vector<double>> FastConv2D::apply(std::vector<std::vector<doubl
         }
     }
 
-    return roll(output, -1, -1);
+    return roll(output, 1, 1);
 }

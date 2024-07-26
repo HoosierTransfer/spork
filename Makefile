@@ -2,7 +2,7 @@ CC := gcc
 CXX := g++
 CFLAGS := -std=c11 -Werror -g -Iinclude -MMD
 CXXFLAGS := -std=c++17 -Werror -g -Iinclude -MMD -fopenmp
-LDFLAGS := -lglfw -lX11 -lpthread -lXrandr -lXi -ldl -lfftw3 -fopenmp
+LDFLAGS := -lglfw -lX11 -lpthread -lXrandr -lXi -ldl -lfftw3 -fopenmp -lxcb
 BIN_DIR := bin
 SRC_DIR := src
 OBJ_DIR := obj
@@ -14,7 +14,7 @@ C_SRC := $(shell find $(SRC_DIR) -name '*.c')
 CPP_OBJ := $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(CPP_SRC))
 C_OBJ := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(C_SRC))
 OBJ := $(CPP_OBJ) $(C_OBJ)
-DEP := $(OBJ:.o=.d)  # Add this line to handle dependencies
+DEP := $(OBJ:.o=.d)
 
 TARGET := main
 
