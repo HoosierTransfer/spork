@@ -74,5 +74,5 @@ std::vector<std::vector<double>> FastConv2D::apply(std::vector<std::vector<doubl
         }
     }
 
-    return roll(output, 1, 1);
+    return roll(output, -1, -1);
 }

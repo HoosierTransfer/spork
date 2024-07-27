@@ -1,2 +1,2 @@
 #pragma once
-// #define OPENMP
+#define OPENMP

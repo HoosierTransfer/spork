@@ -61,6 +61,10 @@ std::vector<std::vector<double>> buildKernel(int size, int nSize, int coreId, in
             kernel[i][j] /= weight;
         }
     }
+
+    if (size == nSize) {
+        return kernel;
+    }
     
     return roll(kernel, 1, 1);
 }

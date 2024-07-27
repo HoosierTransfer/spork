@@ -9,6 +9,6 @@ public:
     Conv2D(std::vector<std::vector<double>> kernel, int inputWidth, int inputHeight);
 
     virtual std::vector<std::vector<double>> apply(std::vector<std::vector<double>> input);
-private:
+protected:
     std::vector<std::vector<double>> kernel;
 };

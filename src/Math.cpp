@@ -162,3 +162,18 @@ std::vector<std::vector<double>> convolve2D(const std::vector<std::vector<double
     
     return roll(result, -1, -1);
 }
+
+bool IsZero(double x) { return (x < EPSILON && x > -EPSILON); }
+bool IsPos(double x) { return (x > EPSILON); }
+bool IsNeg(double x) { return (x < -EPSILON); }
+
+TwoPointsData TwoPoints(double x1, double y1, double x2, double y2, double olda) {
+	double dX = x1 - x2;
+	double dY = y1 - y2;
+	double d = sqrt(dX*dX + dY*dY);
+	double a = IsZero(d) ? 0 : atan2(dY, dX) / M_PI * 180;
+	double da = !olda ? 0 : a - olda;
+    da = wrapD(da + 540, 360) - 180;
+
+    return {d, a, da};
+}

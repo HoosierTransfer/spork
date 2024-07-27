@@ -24,11 +24,14 @@ protected:
     unsigned int width, height;
     std::vector<std::vector<double>> data;
 
+    int generation = 0;
+
 public:
     Grid(unsigned int width, unsigned int height);
     virtual ~Grid();
     void draw();
     virtual void update() = 0;
+    virtual void updateStats(bool shouldCalc) = 0;
     virtual void drawImGui() = 0;
     void setWidth(unsigned int width);
     void setHeight(unsigned int height);

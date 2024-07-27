@@ -123,10 +123,12 @@ double Grid::get(unsigned int x, unsigned int y) const {
 }
 
 void Grid::reset() {
+    generation = 0;
     std::fill(data.begin(), data.end(), std::vector<double>(width, 0.0));
 }
 
 void Grid::randomize() {
+    generation = 0;
     for (unsigned int y = 0; y < height; y++) {
         for (unsigned int x = 0; x < width; x++) {
             data[y][x] = rand() / (double)RAND_MAX;

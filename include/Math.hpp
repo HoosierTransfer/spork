@@ -8,6 +8,12 @@ const double EPSILON = 0.0000001;
 
 const int PRECISION = 1000000;
 
+struct TwoPointsData {
+    double distance;
+    double angle;
+    double angleDiff;
+};
+
 double bell(double x, double m, double s);
 double polynomial(double x, double m, double s, double a);
 int wrap(int x, int n);
@@ -27,3 +33,9 @@ double Round(double x);
 int RandomInt(int min, int max);    
 
 std::vector<std::vector<double>> convolve2D(const std::vector<std::vector<double>>& grid, const std::vector<std::vector<double>>& kernel);
+
+bool IsZero(double x);
+bool IsPos(double x);
+bool IsNeg(double x);
+
+TwoPointsData TwoPoints(double x1, double y1, double x2, double y2, double olda);

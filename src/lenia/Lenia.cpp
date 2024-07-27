@@ -5,6 +5,7 @@
 #include <defines.h>
 
 #include <imgui/imgui.h>
+#include <imgui/implot.h>
 
 #include <map>
 
@@ -50,7 +51,7 @@ Lenia::Lenia(unsigned int width, unsigned int height, LeniaTemplate rule) : Grid
     alpha = rule.alpha;
     delta = vector<vector<double>>(height, vector<double>(width, 0.0));
 
-    setRule("R=13;k=bump4();d=gaus(0.377,0.0697)*0.1;");
+    reset();
 
     tree.addPhylum("Exokernel");
     tree.addClass("Exokernel", "Orbiformes");
@@ -109,6 +110,8 @@ void Lenia::update() {
     }
 
     data = newData;
+
+    generation++;
 }
 #else
 void Lenia::update() {
@@ -129,6 +132,8 @@ void Lenia::update() {
     }
 
     data = newData;
+
+    generation++;
 }
 #endif
 
@@ -153,6 +158,307 @@ double Lenia::deltaFunc(double x) {
     return 0.0;
 }
 
+void Lenia::updateStats(bool shouldCalc) {
+    vol = 0;
+    volg = 0;
+
+    m00 = 0;
+    m10 = 0;
+    m01 = 0;
+    m11 = 0;
+    m20 = 0;
+    m02 = 0;
+    m30 = 0;
+    m03 = 0;
+    m21 = 0;
+    m12 = 0;
+    m22 = 0;
+    m31 = 0;
+    m13 = 0;
+    m40 = 0;
+    m04 = 0;
+
+    g00 = 0;
+    g10 = 0;
+    g01 = 0;
+
+    if (!shouldCalc)
+        return;
+        
+    oldmX = mX - shiftX;
+    oldmY = mY - shiftY;
+    oldaM = aM;
+    oldaMG = aMG;
+    #ifdef OPENMP
+    #pragma omp parallel for reduction(+:m00,m10,m01,m11,m20,m02,m30,m03,m21,m12,m22,m31,m13,m40,m04,g00,g10,g01,vol,volg)
+    #endif
+    for (int i = 0; i < width; i++) {
+        for (int j = 0; j < height; j++) {
+            int y = i<oldmY-width/2 ? i+width : i>oldmY+width/2 ? i-width : i;
+			int x = j<oldmX-width/2 ? j+width : j>oldmX+width/2 ? j-width : j;
+            double v = data[i][j];
+            double g = std::max(0.0, delta[i][j]);
+            if (IsPos(v)) {
+                vol++;
+            }
+            if (IsPos(g)) {
+                volg++;
+            }
+
+            double vx = v*x;
+            double vy = v*y;
+            double vxx = vx*x;
+            double vyy = vy*y;
+            double vxy = vx*y;
+            double vxxx = vxx*x;
+            double vyyy = vyy*y;
+            double vxxy = vxx*y;
+            double vxyy = vyy*x;
+
+            double gx = g*x;
+            double gy = g*y;
+
+            m00 += v;
+            m10 += vx;
+            m01 += vy;
+            m11 += vxy;
+            m20 += vxx;
+            m02 += vyy;
+			m30 += vxxx;
+            m03 += vyyy;
+            m21 += vxxy;
+            m12 += vxyy;
+			m22 += vxxy*y;
+            m31 += vxxx*y;
+            m13 += vyyy*x;
+            m40 += vxxx*x;
+            m04 += vyyy*y;
+			g00 += g;
+			g10 += gx;
+            g01 += gy;
+        }
+    }
+
+    mX = m00 == 0 ? width / 2.0 : m10 / m00;
+    mY = m00 == 0 ? height / 2.0 : m01 / m00;
+    gX = g00 == 0 ? width / 2.0 : g10 / g00;
+    gY = g00 == 0 ? height / 2.0 : g01 / g00;
+
+    double X2 = mX * mX;
+    double X3 = X2 * mX;
+    double Y2 = mY * mY;
+    double Y3 = Y2 * mY;
+    double XY = mX * mY;
+
+    centralMoment11 = m11 - mX * m01;
+    centralMoment20 = m20 - mX * m10;
+	centralMoment02 = m02 - mY * m01;
+    centralMoment30 = m30 - 3.0 * mX * m20 + 2.0 * X2 * m10;
+	centralMoment03 = m03 - 3.0 * mY * m02 + 2.0 * Y2 * m01;
+    centralMoment21 = m21 - 2.0 * mX * m11 - mY * m20 + 2.0 * X2 * m01;
+	centralMoment12 = m12 - 2.0 * mY * m11 - mX * m02 + 2.0 * Y2 * m10;
+    centralMoment22 = m22 - 2.0 * mY * m21 + Y2 * m20 - 2.0 * mX * m12 + 4.0 * XY * m11 - 2.0 * mX * Y2 * m10 + X2 * m02 - 2.0 * X2 * mY * m01 + X2 * Y2 * m00;
+    centralMoment31 = m31 - mY * m30 + 3.0 * mX * (mY * m20 - m21) + 3.0 * X2 * (m11 - mY * m10) + X3 *(mY * m00 - m01);
+    centralMoment13 = m13 - mX * m03 + 3.0 * mY * (mX * m02 - m12) + 3.0 * Y2 * (m11 - mX * m01) + Y3 * (mX * m00 - m10);
+    centralMoment40 = m40 - 4.0 * mX * m30 + 6.0 * X2 * m20 - 4.0 * X3 * m10 + X2 * X2 * m00;
+    centralMoment04 = m04 - 4.0 * mY * m03 + 6.0 * Y2 * m02 - 4.0 * Y3 * m01 + Y2 * Y2 * m00;
+
+    if (IsZero(m00)) {
+        normalizedMoment11 = 0;
+        normalizedMoment20 = 0;
+        normalizedMoment02 = 0;
+        normalizedMoment30 = 0;
+        normalizedMoment03 = 0;
+        normalizedMoment21 = 0;
+        normalizedMoment12 = 0;
+        normalizedMoment22 = 0;
+        normalizedMoment31 = 0;
+        normalizedMoment13 = 0;
+        normalizedMoment40 = 0;
+        normalizedMoment04 = 0;
+    } else {
+        double m2 = m00 * m00;
+        double mA = m00 * m00 * sqrt(m00);
+        double m3 = m00 * m00 * m00;
+        normalizedMoment11 = centralMoment11/m2;
+        normalizedMoment20 = centralMoment20/m2;
+        normalizedMoment02 = centralMoment02/m2;
+		normalizedMoment30 = centralMoment30/mA;
+        normalizedMoment03 = centralMoment03/mA;
+        normalizedMoment21 = centralMoment21/mA;
+        normalizedMoment12 = centralMoment12/mA;
+		normalizedMoment22 = centralMoment22/m3;
+        normalizedMoment31 = centralMoment31/m3;
+        normalizedMoment13 = centralMoment13/m3;
+        normalizedMoment40 = centralMoment40/m3;
+        normalizedMoment04 = centralMoment04/m3;
+    }
+
+    double Z = normalizedMoment11 * 2.0;
+    double A = normalizedMoment20 + normalizedMoment02;
+	double B = normalizedMoment20 - normalizedMoment02;
+	double C = normalizedMoment30 + normalizedMoment12;
+	double D = normalizedMoment30 - normalizedMoment12;
+	double E = normalizedMoment03 + normalizedMoment21;
+	double F = normalizedMoment03 - normalizedMoment21;
+	double G = normalizedMoment30 - 3.0 * normalizedMoment12;
+	double H = 3.0 * normalizedMoment21 - normalizedMoment03;
+	double Y = 2.0 * normalizedMoment22;
+	double I = normalizedMoment40 + normalizedMoment04;
+	double J = normalizedMoment40 - normalizedMoment04;
+	double K = normalizedMoment31 + normalizedMoment13;
+	double L = normalizedMoment31 - normalizedMoment13;
+    double CC = C * C;
+	double EE = E * E;
+	double CC_EE = CC - EE;
+	double CC_EE3 = CC - 3.0 * EE;
+	double CC3_EE = 3.0 * CC - EE;
+	double CE = C * E;
+	double DF = D * F;
+    huMomentInvariant1 = A;
+	huMomentInvariant2 = B * B + Z * Z;
+	huMomentInvariant3 = G * G + H * H;
+	huMomentInvariant4 = CC + EE;
+	huMomentInvariant5 = G * C * CC_EE3 + H * E * CC3_EE;
+	huMomentInvariant7 = H * C * CC_EE3 - G * E * CC3_EE;
+	huMomentInvariant6 = B * CC_EE + 2.0 * Z * CE;
+	huMomentInvariant9 = I + Y;
+	huMomentInvariant8 = Z * CC_EE / 2.0 - B * CE;
+	huMomentInvariant10 = J * CC_EE + 4.0 * L * DF;
+	huMomentInvariant11 = -2.0 * K * CC_EE - 2.0 * J * DF;
+
+    double M = I - 3.0 * Y;
+	double t1 = CC_EE * CC_EE - 4.0 * CE * CE;
+	double t2 = 4.0 * CE * CC_EE;
+
+    huMomentInvariant12 =  4.0 * L * t2 + M * t1;
+	huMomentInvariant13 = -4.0 * L * t1 + M * t2;
+
+    double t3 = huMomentInvariant1 / 2.0 * m00;
+	double t4 = sqrt(huMomentInvariant2) / 2.0 * m00;
+	axisA = t3 + t4;
+	axisB = t3 - t4;
+    ec = sqrt(1.0 - axisB / axisA);
+
+    cp = m00 / (centralMoment20 + centralMoment02);
+
+	th = atan2(Z, B) / 2.0 / M_PI * 180.0;
+
+    dth = 0;
+	if (oldth > 30.0 && th < -30.0) {
+		th180 = wrapD(th180 + 180.0, 360.0);
+		dth = 180.0;
+	} else if (oldth < -30.0 && th > 30.0) {
+		th180 = wrapD(th180 - 180.0, 360.0);
+		dth = -180.0;
+	}
+
+    dth += !oldth ? 0.0 : th - oldth;
+    dth = wrapD(dth + 540.0, 360.0) - 180.0;
+	oldth = th;
+	th += th180;
+
+    TwoPointsData p2 = TwoPoints(mX, mY, oldmX, oldmY, oldaM);
+    dM = p2.distance;
+    aM = p2.angle;
+    daM = p2.angleDiff;
+    p2 = TwoPoints(mX, mY, gX, gY, oldaMG);
+    dMG = p2.distance;
+    aMG = p2.angle;
+    daMG = p2.angleDiff;
+
+    if (generation < 2) {
+        daM = 0;
+        daMG = 0;
+    }
+
+    arrowX = mX;
+    arrowY = mY;
+    mX = wrapD(mX, width);
+    mY = wrapD(mY, height);
+    if (generation < 10) {
+        return;
+    }
+
+    updateStat("Mass", m00/NS/NS, true, 0.0);
+    updateStat("Growth", g00/NS/NS, true, 0.0);
+    updateStat("Mass Volume", vol/NS/NS, true, 0.0);
+    updateStat("Growth Volume", volg/NS/NS, true, 0.0);
+    updateStat("Mass Density", m00/vol, false, 0.0);
+    updateStat("Growth Density", g00/volg, false, 0.0);
+    updateStat("Centroid Speed", dM/NS*updateFrequency, false, 0.0);
+    updateStat("Growth Centroid Distance", dMG/NS, false, 0.0);
+    updateStat("Centroid rotate speed", dM/NS*updateFrequency<0.01 ? 0 : daM*updateFrequency, false, 0.0);
+    updateStat("Growth Centroid rotate speed", dMG/NS<0.01 ? 0 : daMG*updateFrequency, false, 100, true, true);
+    updateStat("Major axis rotate speed", dth*updateFrequency, false, 100.0, true, true);
+    updateStat("Moment of inertia", huMomentInvariant1, true, 0.0);
+    updateStat("Skewness", huMomentInvariant4, false, 0.0, false, false);
+    updateStat("Hu's 5", huMomentInvariant5, false, 0.0, false, false);
+    updateStat("Hu's 6", huMomentInvariant6, false, 0.0, false, false);
+    updateStat("Hu's 7", huMomentInvariant7, false, 0.0, false, false);
+    updateStat("Kurtosis", huMomentInvariant9, false, 0.0);
+    updateStat("Flusser's 8", huMomentInvariant10, false, 0.0, false, false);
+    updateStat("Flusser's 9", huMomentInvariant11, false, 0.0, false, false);
+    updateStat("Flusser's 10", huMomentInvariant12, false, 0.0, false, false);
+}
+
+void Lenia::updateStat(std::string name, double value, bool logScale, double max) {
+    updateStat(name, value, logScale, max, false, true);
+}
+
+void Lenia::updateStat(std::string name, double value, bool logScale, double max, bool forceMax, bool add) {
+    for (Stat& stat : stats) {
+        if (stat.name == name) {
+            stat.value = value;
+            if (stat.max + add ? 0.1 : 0.0 > *std::max_element(stat.data.begin(), stat.data.end())) {
+                stat.max = *std::max_element(stat.data.begin(), stat.data.end());
+                if (add) {
+                    stat.max += 0.1;
+                }
+            }
+            if (abs(logScale ? log(abs(value) + 0.5) : value) > stat.max) {
+                stat.max = abs(logScale ? log(abs(value) + 0.5) : value);
+                if (add) {
+                    stat.max += 0.1;
+                }
+            }
+
+            if (forceMax) {
+                stat.max = max;
+            }
+            stat.data.push_back(abs(logScale ? log(abs(value) + 0.5) : value));
+            if (stat.data.size() > statLength) {
+                stat.data.erase(stat.data.begin());
+            }
+            return;
+        }
+    }
+
+    Stat stat;
+    stat.name = name;
+    stat.value = value;
+    stat.data = vector<double>(statLength, 0.0);
+    stat.data.push_back(abs(logScale ? log(abs(value)) : value));
+    stat.max = max;
+    if (stat.data.size() > statLength) {
+        stat.data.erase(stat.data.begin());
+    }
+    stats.push_back(stat);
+}
+
+void Sparkline(std::string id, const double* value, int count, double min_v, double max_v, int offset, const ImVec4& color, const ImVec2& size) {
+    ImPlot::PushStyleVar(ImPlotStyleVar_PlotPadding, ImVec2(0,0));
+    if (ImPlot::BeginPlot(id.c_str(), size, ImPlotFlags_CanvasOnly)) {
+        ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoDecorations, ImPlotAxisFlags_NoDecorations);
+        ImPlot::SetupAxesLimits(0, count - 1, min_v, max_v, ImGuiCond_Always);
+        ImPlot::SetNextLineStyle(color);
+        ImPlot::SetNextFillStyle(color, 0.25);
+        ImPlot::PlotLine(id.c_str(), value, count, 1, 0, ImPlotLineFlags_Shaded, offset);
+        ImPlot::EndPlot();
+    }
+    ImPlot::PopStyleVar();
+}
+
 void Lenia::drawImGui() {
     ImGui::Begin("Simulation Parameters", nullptr);
     double min = 0.0;
@@ -173,6 +479,35 @@ void Lenia::drawImGui() {
     ImGui::Begin("Organisms", nullptr);
     // use the taxonomy tree to display the organisms
     drawTree(tree.root, 0);
+    ImGui::End();
+
+    ImGui::Begin("Stats", nullptr);
+    if (ImGui::BeginTable("##table", 3, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV |
+                                   ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable, ImVec2(-1,0))) {
+        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 75.0f);
+        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 75.0f);
+        ImGui::TableSetupColumn("Plot");
+        ImGui::TableHeadersRow();
+        ImPlot::PushColormap(ImPlotColormap_Cool); 
+        int row = 0;
+        for (Stat& stat : stats) {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextUnformatted(stat.name.c_str());
+            ImGui::TableSetColumnIndex(1);
+            stringstream stream;
+            stream << fixed << setprecision(3) << stat.value;
+            string v = stream.str();
+            ImGui::TextUnformatted(v.c_str());
+            ImGui::TableSetColumnIndex(2);
+            ImGui::PushID(row);
+            Sparkline(stat.name, stat.data.data(), statLength, 0, stat.max, 0, ImPlot::GetColormapColor(row), ImVec2(ImGui::GetContentRegionAvail().x, 35));
+            ImGui::PopID();
+            row++;
+        }
+        ImPlot::PopColormap();
+        ImGui::EndTable();
+    }
     ImGui::End();
 }
 
@@ -269,26 +604,6 @@ void Lenia::setRule(string rule) {
     sigma = templateRule.sigma;
     alpha = templateRule.alpha;
     deltaId = templateRule.deltaId;
-
-    // print out the rule
-    cout << "Rule: " << rule << endl;
-    cout << "Kernel Radius: " << templateRule.kernelRadius << endl;
-    cout << "Core ID: " << templateRule.coreId << endl;
-    cout << "Layer ID: " << templateRule.layerId << endl;
-    cout << "Delta ID: " << templateRule.deltaId << endl;
-    cout << "Mu: " << templateRule.mu << endl;
-    cout << "Sigma: " << templateRule.sigma << endl;
-    cout << "Alpha: " << templateRule.alpha << endl;
-    cout << "Kernel B: ";
-    for (double d : templateRule.kernel_B) {
-        cout << d << " ";
-    }
-    cout << endl;
-    cout << "Kernel E: ";
-    for (double d : templateRule.kernel_E) {
-        cout << d << " ";
-    }
-    cout << endl;
 }
 
 vector<string> sliceString(const vector<string>& vec, int start, int end) {
@@ -376,3 +691,109 @@ void Lenia::parse(string pattern) {
 string Lenia::toString() const {
     return "";
 }
+
+void Lenia::reset() {
+    for (unsigned int y = 0; y < height; y++) {
+        for (unsigned int x = 0; x < width; x++) {
+            data[y][x] = 0.0;
+        }
+    }
+    generation = 0;
+
+        mX = 0;
+    mY = 0;
+
+    gX = 0;
+    gY = 0;
+
+    axisA = 0;
+    axisB = 0;
+    th = 0;
+    ec = 0;
+    cp = 0;
+
+    vol = 0;
+    volg = 0;
+    moi = 0;
+    rog = 0;
+
+    m00 = 0;
+    m10 = 0;
+    m01 = 0;
+    m11 = 0;
+    m20 = 0;
+    m02 = 0;
+    m30 = 0;
+    m03 = 0;
+    m21 = 0;
+    m12 = 0;
+    m22 = 0;
+    m31 = 0;
+    m13 = 0;
+    m40 = 0;
+    m04 = 0;
+
+    g00 = 0;
+    g10 = 0;
+    g01 = 0; 
+
+    centralMoment11 = 0;
+    centralMoment20 = 0;
+    centralMoment02 = 0;
+    centralMoment30 = 0;
+    centralMoment03 = 0;
+    centralMoment21 = 0; 
+    centralMoment12 = 0;
+    centralMoment22 = 0;
+    centralMoment31 = 0;
+    centralMoment13 = 0;
+    centralMoment40 = 0;
+    centralMoment04 = 0;
+
+    normalizedMoment11 = 0;
+    normalizedMoment20 = 0;
+    normalizedMoment02 = 0;
+    normalizedMoment30 = 0;
+    normalizedMoment03 = 0;
+    normalizedMoment21 = 0; 
+    normalizedMoment12 = 0;
+    normalizedMoment22 = 0;
+    normalizedMoment31 = 0;
+    normalizedMoment13 = 0;
+    normalizedMoment40 = 0;
+    normalizedMoment04 = 0;
+
+    huMomentInvariant1 = 0;
+    huMomentInvariant2 = 0;
+    huMomentInvariant3 = 0;
+    huMomentInvariant4 = 0;
+    huMomentInvariant5 = 0;
+    huMomentInvariant6 = 0;
+    huMomentInvariant7 = 0;
+    huMomentInvariant8 = 0;
+    huMomentInvariant9 = 0;
+    huMomentInvariant10 = 0;
+    huMomentInvariant11 = 0;
+    huMomentInvariant12 = 0;
+    huMomentInvariant13 = 0;
+
+    oldth = 0;
+    dth = 0;
+    th180 = 0;
+
+    shiftX = 0;
+    shiftY = 0;
+    oldmX = 0;
+    oldmY = 0;
+    dM = 0;
+    aM = 0;
+    oldaM = 0;
+    daM = 0;
+    aMG = 0;
+    dMG = 0;
+    oldaMG = 0;
+    daMG = 0;
+    // reset stats
+    stats.clear();
+}
+
