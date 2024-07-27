@@ -4,6 +4,14 @@
 #include <cmath>
 #include <cstring>
 
+#include <map>
+#include <algorithm>
+#include <iostream>
+
+#include <opencv2/opencv.hpp>
+
+#include <Framebuffer.hpp>
+
 Grid::Grid(unsigned int width, unsigned int height) : width(width), height(height), shader("grid") {
     float vertices[] = {
         1.0f, 1.0f, 0.0f, 1.0f, 1.0f,
@@ -147,3 +155,54 @@ void Grid::randomizePatches() {
         }
     }
 }
+
+void Grid::exportToVideo(const std::string& filename, int frameCount, int fps) {
+    // Create VideoWriter object
+    cv::VideoWriter videoWriter(filename, cv::VideoWriter::fourcc('a', 'v', 'c', '1'), fps, cv::Size(512, 512), true);
+
+    if (!videoWriter.isOpened()) {
+        std::cerr << "Error opening video file for write." << std::endl;
+        return;
+    }
+
+    Framebuffer framebuffer(512, 512);
+
+    // Ensure framebuffer is bound before capturing
+    framebuffer.bind();
+    framebuffer.resize(512, 512);  
+    glViewport(0, 0, 512, 512);
+
+    // Draw and capture each frame
+    for (int frame = 0; frame < frameCount; ++frame) {
+        framebuffer.clear();
+
+        // Draw the grid
+        draw();
+
+        // Read pixels from the framebuffer
+        std::vector<unsigned char> pixels(512 * 512 * 3); // RGB
+        glReadPixels(0, 0, 512, 512, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+
+        // Convert to OpenCV matrix
+        cv::Mat image(512, 512, CV_8UC3, pixels.data());
+        cv::Mat flippedImage;
+        cv::flip(image, flippedImage, 0); // Flip the image vertically
+
+        cv::Mat bgrImage;
+        cv::cvtColor(flippedImage, bgrImage, cv::COLOR_RGBA2BGR);
+
+
+        // Write the frame to the video
+        videoWriter.write(bgrImage);
+
+        // Update the grid
+        update();
+    }
+
+    // Release the framebuffer
+    framebuffer.unbind();
+
+    videoWriter.release();
+}
+
+

@@ -1,8 +1,8 @@
 CC := gcc
 CXX := g++
-CFLAGS := -std=c11 -Werror -g -Iinclude -MMD
-CXXFLAGS := -std=c++17 -Werror -g -Iinclude -MMD -fopenmp
-LDFLAGS := -lglfw -lX11 -lpthread -lXrandr -lXi -ldl -lfftw3 -fopenmp -lxcb
+CFLAGS := -std=c11 -Werror -g -Iinclude -I/usr/local/include/opencv4 -MMD -O3 -march=native
+CXXFLAGS := -std=c++17 -Werror -g -Iinclude -I/usr/local/include/opencv4 -MMD -fopenmp -O3 -march=native
+LDFLAGS := -L/usr/local/lib/ -lglfw -lX11 -lpthread -lXrandr -lXi -ldl -lfftw3 -fopenmp -lxcb -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_videoio
 BIN_DIR := bin
 SRC_DIR := src
 OBJ_DIR := obj

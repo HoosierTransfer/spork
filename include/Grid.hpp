@@ -3,9 +3,7 @@
 #include <vector>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-
 #include <Shader.hpp>
-
 #include <string>
 
 class Grid {
@@ -17,13 +15,15 @@ private:
     unsigned int texture;
 
     void normalize();
-
     float* getData();
+
+    void quantizeFrame(const std::vector<unsigned char>& frame,
+                       std::vector<unsigned char>& colorArray,
+                       std::vector<unsigned int>& indexedImage);
 
 protected:
     unsigned int width, height;
     std::vector<std::vector<double>> data;
-
     int generation = 0;
 
 public:
@@ -37,22 +37,18 @@ public:
     void setHeight(unsigned int height);
     unsigned int getWidth() const;
     unsigned int getHeight() const;
-
     virtual void parse(std::string pattern) = 0;
     virtual std::string toString() const = 0;
-
     void reset();
     void randomize();
-
     void randomizePatches();
-
     std::vector<double>& operator[](unsigned int row);
     const std::vector<double>& operator[](unsigned int row) const;
-
     void set(unsigned int x, unsigned int y, double value);
     double get(unsigned int x, unsigned int y) const;
 
     int randomPatches;
     int randomPatchSize;
-};
 
+    void exportToVideo(const std::string& filename, int frameCount, int fps);
+};
